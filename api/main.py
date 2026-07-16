@@ -744,18 +744,24 @@ def analyze_raw_api(payload: RawPayload):
 # -------------------------------------------------------------
 # SERVING WEB FRONTEND FILES
 # -------------------------------------------------------------
-# Mount static files at /static
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# Only mount static files and serve index HTML if NOT running in Vercel.
+# Vercel's edge routers will handle this static file routing directly via vercel.json.
+if not os.environ.get("VERCEL"):
+    try:
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    except Exception as e:
+        print(f"Static files mount warning: {e}", sys.stderr)
 
-@app.get("/", response_class=HTMLResponse)
-def get_dashboard_index():
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if not os.path.exists(index_path):
-        return HTMLResponse("<h1>Index HTML File not found!</h1>", status_code=404)
-    with open(index_path, "r") as f:
-        return f.read()
+    @app.get("/", response_class=HTMLResponse)
+    def get_dashboard_index():
+        index_path = os.path.join(STATIC_DIR, "index.html")
+        if not os.path.exists(index_path):
+            return HTMLResponse("<h1>Index HTML File not found!</h1>", status_code=404)
+        with open(index_path, "r") as f:
+            return f.read()
 
 # Start application server handler
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
