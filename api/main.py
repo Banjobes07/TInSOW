@@ -540,65 +540,38 @@ def get_cve_feed_api():
     ]
     
     try:
-        # Fetch from CIRCL CVE API (returns recent 30 entries)
-        res = requests.get("https://cve.circl.lu/api/last", timeout=4)
+        # Fetch from the popular and reliable project cve.org list wrapper API or NVD
+        # For simplicity, we query a reliable public aggregator (e.g. cveawg or open-source feeds like vulners/cveapi)
+        res = requests.get("https://cveapi.com/api/last", timeout=4)
+        if res.status_code != 200:
+            # Fallback to an alternative open repository feed
+            res = requests.get("https://raw.githubusercontent.com/CVEProject/cvelistV5/main/recent_activities.json", timeout=4)
+            
         if res.status_code == 200:
             cves = res.json()
             feed = []
-            for cve in cves[:8]:
-                # 1. Parse modern CVE JSON 5.0 format
-                if "cveMetadata" in cve and "containers" in cve:
-                    cve_id = cve["cveMetadata"].get("cveId", "Unknown")
-                    
-                    # Extract description
-                    descriptions = cve["containers"].get("cna", {}).get("descriptions", [])
-                    desc = descriptions[0].get("value", "No description available.") if descriptions else "No description available."
-                    
-                    # Extract date
-                    pub_date = cve["cveMetadata"].get("datePublished", "N/A")[:10]
-                    
-                    # Extract CVSS
-                    cvss = None
-                    metrics = cve["containers"].get("cna", {}).get("metrics", [])
-                    if metrics:
-                        # Try parsing v4.0, v3.1, or v3.0 scores
-                        for m in metrics:
-                            if "cvssV4_0" in m:
-                                cvss = m["cvssV4_0"].get("baseScore")
-                                break
-                            elif "cvssV3_1" in m:
-                                cvss = m["cvssV3_1"].get("baseScore")
-                                break
-                            elif "cvssV3_0" in m:
-                                cvss = m["cvssV3_0"].get("baseScore")
-                                break
-                    
-                    feed.append({
-                        "id": cve_id or "Unknown-CVE",
-                        "description": desc or "No description available.",
-                        "published_date": pub_date or "N/A",
-                        "cvss": cvss if cvss is not None else "N/A"
-                    })
-
+            # Parse typical recent feed structure
+            items = cves if isinstance(cves, list) else cves.get("cves", cves.get("results", []))
+            for cve in items[:8]:
+                cve_id = cve.get("id") or cve.get("cveId") or "Unknown-CVE"
+                desc = cve.get("description") or cve.get("summary") or "No description available."
+                pub_date = cve.get("published_date") or cve.get("Published") or "N/A"
+                cvss = cve.get("cvss") or cve.get("cvssScore")
                 
-                # 2. Parse legacy schema format
-                else:
-                    feed.append({
-                        "id": cve.get("id") or "Unknown-CVE",
-                        "description": cve.get("summary") or "No description available.",
-                        "published_date": cve.get("Published", "N/A")[:10] if cve.get("Published") else "N/A",
-                        "cvss": cve.get("cvss") if cve.get("cvss") is not None else "N/A"
-                    })
-
+                feed.append({
+                    "id": cve_id,
+                    "description": desc,
+                    "published_date": pub_date[:10] if pub_date else "N/A",
+                    "cvss": cvss if cvss is not None else "N/A"
+                })
             
-            # Mix standard ones in if feed from CIRCL is small
-            if len(feed) < 3:
-                return fallback_feed
-            return feed
+            if len(feed) >= 3:
+                return feed
     except Exception as e:
-        print(f"CIRCL API down, returning fallback: {e}")
+        print(f"External CVE API down, returning fallback: {e}")
         
     return fallback_feed
+
 
 # -------------------------------------------------------------
 # SPECIFIC ANALYZERS (CVE, OTX, RAW TEXT)
