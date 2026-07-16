@@ -574,20 +574,22 @@ def get_cve_feed_api():
                                 break
                     
                     feed.append({
-                        "id": cve_id,
-                        "description": desc,
-                        "published_date": pub_date,
-                        "cvss": cvss
+                        "id": cve_id or "Unknown-CVE",
+                        "description": desc or "No description available.",
+                        "published_date": pub_date or "N/A",
+                        "cvss": cvss if cvss is not None else "N/A"
                     })
+
                 
                 # 2. Parse legacy schema format
                 else:
                     feed.append({
-                        "id": cve.get("id"),
-                        "description": cve.get("summary", "No description available."),
+                        "id": cve.get("id") or "Unknown-CVE",
+                        "description": cve.get("summary") or "No description available.",
                         "published_date": cve.get("Published", "N/A")[:10] if cve.get("Published") else "N/A",
-                        "cvss": cve.get("cvss")
+                        "cvss": cve.get("cvss") if cve.get("cvss") is not None else "N/A"
                     })
+
             
             # Mix standard ones in if feed from CIRCL is small
             if len(feed) < 3:
