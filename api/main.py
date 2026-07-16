@@ -87,10 +87,14 @@ except Exception as e:
 # CONFIGURATION SETTINGS
 # -------------------------------------------------------------
 def get_config():
+    # Force system environment variables if set (highly secure and reliable for serverless)
+    sys_gemini = os.environ.get("GEMINI_API_KEY", "")
+    sys_otx = os.environ.get("OTX_API_KEY", "")
+    
     if not os.path.exists(CONFIG_PATH):
         default_config = {
-            "gemini_api_key": os.environ.get("GEMINI_API_KEY", ""),
-            "otx_api_key": os.environ.get("OTX_API_KEY", ""),
+            "gemini_api_key": sys_gemini,
+            "otx_api_key": sys_otx,
             "model": "gemini-3.5-flash"
         }
         try:
@@ -103,16 +107,24 @@ def get_config():
             print(f"Error writing default config: {e}", sys.stderr)
         return default_config
 
-    
     with open(CONFIG_PATH, "r") as f:
         try:
-            return json.load(f)
+            config = json.load(f)
         except json.JSONDecodeError:
-            return {
-                "gemini_api_key": "",
-                "otx_api_key": "",
+            config = {
+                "gemini_api_key": sys_gemini,
+                "otx_api_key": sys_otx,
                 "model": "gemini-3.5-flash"
             }
+            
+    # Always prioritize environment variables over file configs if env vars are configured
+    if sys_gemini:
+        config["gemini_api_key"] = sys_gemini
+    if sys_otx:
+        config["otx_api_key"] = sys_otx
+        
+    return config
+
 
 def save_config(config_data):
     with open(CONFIG_PATH, "w") as f:
