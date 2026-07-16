@@ -18,8 +18,11 @@ import google.generativeai as genai
 app = FastAPI(
     title="TInSOW Backend",
     description="Threat Intel & SecOps Workspace Backend API",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json"
 )
+
 
 # Workspace Paths
 # For Vercel/serverless environments, use /tmp for SQLite database if writable, or local directory
