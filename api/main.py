@@ -22,10 +22,12 @@ app = FastAPI(
 )
 
 # Workspace Paths
-WORKSPACE_DIR = "/home/akkile/Desktop/TInSOW"
-DB_PATH = os.path.join(WORKSPACE_DIR, "intel.db")
-CONFIG_PATH = os.path.join(WORKSPACE_DIR, "config.json")
-STATIC_DIR = os.path.join(WORKSPACE_DIR, "static")
+# For Vercel/serverless environments, use /tmp for SQLite database if writable, or local directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.environ.get("DB_PATH", "/tmp/intel.db" if os.environ.get("VERCEL") else os.path.join(BASE_DIR, "intel.db"))
+CONFIG_PATH = os.environ.get("CONFIG_PATH", "/tmp/config.json" if os.environ.get("VERCEL") else os.path.join(BASE_DIR, "config.json"))
+STATIC_DIR = os.environ.get("STATIC_DIR", os.path.join(BASE_DIR, "public"))
+
 
 # -------------------------------------------------------------
 # DATABASE INITIALIZATION & OPERATIONS
@@ -67,8 +69,16 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Initialize Database
-init_db()
+# Initialize Database on import safely
+try:
+    # Ensure directory for DB exists
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+    init_db()
+except Exception as e:
+    print(f"Database initialization warning: {e}", sys.stderr)
+
 
 # -------------------------------------------------------------
 # CONFIGURATION SETTINGS
@@ -80,9 +90,16 @@ def get_config():
             "otx_api_key": os.environ.get("OTX_API_KEY", ""),
             "model": "gemini-3.5-flash"
         }
-        with open(CONFIG_PATH, "w") as f:
-            json.dump(default_config, f, indent=4)
+        try:
+            config_dir = os.path.dirname(CONFIG_PATH)
+            if config_dir and not os.path.exists(config_dir):
+                os.makedirs(config_dir, exist_ok=True)
+            with open(CONFIG_PATH, "w") as f:
+                json.dump(default_config, f, indent=4)
+        except Exception as e:
+            print(f"Error writing default config: {e}", sys.stderr)
         return default_config
+
     
     with open(CONFIG_PATH, "r") as f:
         try:
